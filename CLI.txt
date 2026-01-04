@@ -1,0 +1,176 @@
+BACKUP CLI – REQUIREMENTS (REWRITE FROM CLI.pdf)
+===============================================
+
+1. MỤC TIÊU
+-----------
+Xây dựng một công cụ dòng lệnh (CLI) để backup và restore dữ liệu trên Linux.
+Hệ thống phải đảm bảo:
+- Toàn vẹn dữ liệu (Integrity)
+- Phát hiện chỉnh sửa trái phép (Tamper detection)
+- Chống rollback
+- An toàn khi crash
+- Kiểm soát truy cập dựa trên OS User
+- Có audit log kiểm tra được
+
+Không yêu cầu giao diện đồ họa.
+Không yêu cầu network.
+Không yêu cầu database.
+
+
+2. MÔI TRƯỜNG & CÔNG NGHỆ
+------------------------
+- Ngôn ngữ: Python 3
+- Hệ điều hành: Linux (Ubuntu, WSL2 được chấp nhận)
+- Chạy dưới dạng CLI
+- Không hardcode username
+- Không sử dụng thư viện DB ngoài
+
+
+3. CẤU TRÚC DỮ LIỆU
+-------------------
+
+3.1 Dataset
+- dataset/ là thư mục dữ liệu gốc để backup
+- dataset không phải nơi lưu backup
+- dataset có thể bị sửa/xóa sau khi backup để test restore
+- dataset không bắt buộc phải commit lên git
+
+3.2 Backup Store (store/)
+- store/ là nơi lưu toàn bộ dữ liệu backup
+- gồm các thành phần:
+
+store/
+├── chunks/        : lưu các mảnh dữ liệu theo hash (content-addressable)
+├── snapshots/     : lưu metadata của từng snapshot
+│   └── <snapshot_id>/
+│       ├── manifest.json
+│       └── metadata.json
+├── journal.log    : Write-Ahead Log để chống crash
+└── audit.log      : Audit log append-only có hash chain
+
+
+4. SNAPSHOT
+-----------
+- Mỗi lần backup tạo ra một snapshot
+- Snapshot có ID duy nhất (timestamp hoặc hash)
+- Snapshot gồm:
+  - manifest.json:
+      + mô tả cây thư mục
+      + mapping file -> list chunk hash
+  - metadata.json:
+      + snapshot_id
+      + timestamp
+      + merkle_root
+      + prev_snapshot_root (để chống rollback)
+
+- Snapshot chỉ được coi là hợp lệ khi:
+  - ghi xong manifest
+  - ghi xong metadata
+  - journal commit thành công
+
+
+5. CHUNKING & DEDUP
+-------------------
+- File được chia thành các chunk kích thước cố định
+- Mỗi chunk được hash (SHA-256)
+- Chunk được lưu trong store/chunks theo tên hash
+- Nếu chunk đã tồn tại thì không lưu lại (deduplication)
+
+
+6. INTEGRITY & VERIFY
+---------------------
+- Tính Merkle Tree từ manifest
+- Lưu Merkle root vào metadata
+- Khi verify:
+  - đọc lại manifest
+  - tính lại Merkle root
+  - so sánh với metadata
+- Nếu không khớp → snapshot bị tamper
+
+
+7. ROLLBACK PROTECTION
+----------------------
+- Mỗi snapshot lưu prev_snapshot_root
+- Khi verify chain:
+  - snapshot sau phải trỏ đúng snapshot trước
+- Nếu bị thay thế snapshot cũ → phát hiện rollback
+
+
+8. CRASH CONSISTENCY (WAL)
+--------------------------
+- Dùng journal.log để ghi trạng thái backup
+- Trình tự:
+  1. START snapshot
+  2. WRITE chunks
+  3. WRITE manifest
+  4. WRITE metadata
+  5. COMMIT snapshot
+
+- Nếu crash trước COMMIT:
+  - snapshot không được xuất hiện trong list
+  - dữ liệu dở dang bị bỏ qua
+
+
+9. POLICY & ACCESS CONTROL
+--------------------------
+- Không có login/password
+- Xác định user từ OS:
+  - ưu tiên SUDO_USER
+  - nếu không có dùng OS username
+- Policy được định nghĩa trong policy.yaml
+
+policy.yaml gồm:
+- users: mapping OS user -> role
+- roles: mapping role -> allowed commands
+
+Nếu user không được phép:
+- command không được thực thi
+- vẫn phải ghi audit log (DENY)
+
+
+10. AUDIT LOG
+-------------
+- Mọi command đều phải ghi audit log
+- Audit log là append-only
+- Mỗi entry chứa:
+  - hash của entry hiện tại
+  - hash entry trước
+  - timestamp
+  - user
+  - command
+  - status (OK / DENY / FAIL)
+
+- audit-verify:
+  - đọc audit.log từ đầu
+  - kiểm tra hash chain
+  - nếu bị sửa → báo lỗi
+
+
+11. CLI COMMANDS
+----------------
+- init <store_path>
+- backup <dataset_path>
+- list-snapshots
+- verify <snapshot_id>
+- restore <snapshot_id> <output_path>
+- audit-verify
+
+
+12. TESTING
+-----------
+Cần có test script để chứng minh:
+- sửa chunk → verify fail
+- sửa manifest → verify fail
+- rollback snapshot → detect
+- kill giữa backup → snapshot không xuất hiện
+- user không đủ quyền → DENY + audit log
+- sửa audit.log → audit-verify fail
+
+
+13. YÊU CẦU CHUNG
+-----------------
+- Code chia module rõ ràng
+- main.py chỉ điều phối, không nhét logic
+- Không hardcode path, user, role
+- Có README giải thích thiết kế
+- Chạy được trên máy khác sau khi clone
