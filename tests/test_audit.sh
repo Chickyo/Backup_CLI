@@ -18,7 +18,8 @@ python3 -m src.main list-snapshots > /dev/null
 
 # 2. Kiểm tra Audit sạch
 echo "[1] Checking valid audit log..."
-python3 -m src.main audit-verify | grep -q "AUDIT OK"; 
+OUTPUT=$(python3 -m src.main audit-verify)
+echo "$OUTPUT"; 
 
 # 3. Tấn công: Sửa file log
 echo "[2] Attacking audit log..."

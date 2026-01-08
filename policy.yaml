@@ -2,8 +2,7 @@ users:
   alice: admin
   bob: operator
   eve: auditor
-  # Thay 'ubuntu' bằng username thật của bạn trên WSL khi test 
-  ubuntu: admin 
+  ubuntu: operator
 
 roles:
   admin:
@@ -13,7 +12,7 @@ roles:
     - verify
     - restore
     - audit-verify
-  
+
   operator:
     - backup
     - list-snapshots
