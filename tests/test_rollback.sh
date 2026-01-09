@@ -51,9 +51,9 @@ echo "$OUTPUT"
 # 6. Kiểm tra kết quả
 echo ""
 if echo "$OUTPUT" | grep -q "VERIFY FAIL"; then
-    echo -e "${GREEN}✓ PASS: Hệ thống phát hiện được ROLLBACK ATTACK!${NC}"
+    echo -e "${GREEN}PASS: Hệ thống phát hiện được ROLLBACK ATTACK!${NC}"
 else
-    echo -e "${RED}✗ FAIL: Không phát hiện được rollback attack${NC}"
+    echo -e "${RED}FAIL: Không phát hiện được rollback attack${NC}"
 fi
 
 echo ""
