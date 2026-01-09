@@ -2,7 +2,9 @@ users:
   alice: admin
   bob: operator
   eve: auditor
-  ubuntu: operator
+  Chicky: admin
+  chicky: admin
+
 
 roles:
   admin:

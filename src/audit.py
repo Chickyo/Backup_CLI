@@ -54,7 +54,7 @@ class AuditLogger:
         """Lệnh audit-verify: kiểm tra tính toàn vẹn của chuỗi hash."""
         if not os.path.exists(self.log_path):
             print("Audit log not found.")
-            return
+            return False
 
         print("Verifying audit log...")
         expected_prev = "0" * 64
@@ -65,7 +65,7 @@ class AuditLogger:
                 parts = line.strip().split()
                 if len(parts) < 7:
                     print(f"AUDIT CORRUPTED at line {line_num}: Invalid format.")
-                    return
+                    return False
 
                 entry_hash = parts[0]
                 prev_hash_in_log = parts[1]
@@ -76,16 +76,17 @@ class AuditLogger:
                     print(f"AUDIT CORRUPTED at line {line_num}: Broken chain.")
                     print(f"Expected prev: {expected_prev}")
                     print(f"Actual prev:   {prev_hash_in_log}")
-                    return
+                    return False
 
                 # 2. Tính lại hash dòng này xem có khớp entry_hash không
                 cal_hash = compute_string_sha256(content_rest)
                 if cal_hash != entry_hash:
                     print(f"AUDIT CORRUPTED at line {line_num}: Content modified.")
-                    return
+                    return False
                 
                 expected_prev = entry_hash
                 line_num += 1
         
         print(f"AUDIT OK. Head Hash: {expected_prev}")
+        return True
         

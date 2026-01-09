@@ -96,6 +96,19 @@ def main():
                 os.makedirs(args.store_path)
                 os.makedirs(os.path.join(args.store_path, "chunks"))
                 os.makedirs(os.path.join(args.store_path, "snapshots"))
+                
+                # Tạo audit.log
+                with open(os.path.join(args.store_path, "audit.log"), 'w') as f:
+                    f.write("")
+                
+                # Tạo journal.log
+                with open(os.path.join(args.store_path, "journal.log"), 'w') as f:
+                    f.write("")
+                
+                # Tạo roots.log
+                with open(os.path.join(args.store_path, "roots.log"), 'w') as f:
+                    f.write("")
+                
                 print(f"Initialized store at {args.store_path}")
 
         elif args.command == "backup":
@@ -128,7 +141,8 @@ def main():
             integrity.restore(args.snapshot_id, args.target)
 
         elif args.command == "audit-verify":
-            audit.verify_chain()
+            if not audit.verify_chain():
+                status = "FAIL"
 
     except Exception as e:
         print(f"Runtime Error: {e}")

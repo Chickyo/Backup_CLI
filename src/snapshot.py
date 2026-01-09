@@ -12,7 +12,8 @@ chứa các file:
 import os
 import time
 import json
-from .utils import canonical_json_dump, compute_sha256
+import random
+from .utils import canonical_json_dump, merkle_root_from_manifest, compute_string_sha256
 from .storage import StorageEngine
 from .recovery import RecoveryManager
 
@@ -20,26 +21,32 @@ class SnapshotManager:
     def __init__(self, store_path="store"):
         self.store_path = store_path
         self.snapshots_base = os.path.join(store_path, "snapshots")
+        self.roots_log_path = os.path.join(store_path, "roots.log")
         self.storage = StorageEngine(store_path)
         self.recovery = RecoveryManager(store_path)
         os.makedirs(self.snapshots_base, exist_ok=True)
 
     def get_latest_snapshot(self):
-        """Lấy snapshot gần nhất để lấy prev_root (Chống rollback)."""
-        snaps = sorted(os.listdir(self.snapshots_base))
-        valid_snaps = [s for s in snaps if s.startswith("snapshot_")]
-        
-        if not valid_snaps:
+        """Lấy merkle_root và entry_hash của snapshot cuối cùng từ roots.log"""
+        if not os.path.exists(self.roots_log_path):
             return None
         
-        # Lấy cái cuối cùng theo tên (timestamp hoặc id tăng dần)
-        last_snap_dir = os.path.join(self.snapshots_base, valid_snaps[-1])
-        meta_path = os.path.join(last_snap_dir, "metadata.json")
+        with open(self.roots_log_path, 'r') as f:
+            lines = [line.strip() for line in f if line.strip()]
         
-        if os.path.exists(meta_path):
-            with open(meta_path, 'r') as f:
-                return json.load(f)
-        return None
+        if not lines:
+            return None
+        
+        # Parse dòng cuối: ENTRY_HASH PREV_HASH ROOT
+        last_line = lines[-1]
+        parts = last_line.split()
+        if len(parts) != 3:
+            return None
+        
+        return {
+            'merkle_root': parts[2],
+            'prev_hash': parts[0]
+        }
 
     def create_snapshot(self, source_dir, label):
         """
@@ -49,9 +56,11 @@ class SnapshotManager:
         3. Scan file -> Chunking -> Build Manifest
         4. Tính Merkle Root
         5. Ghi Metadata (kèm prev_root)
-        6. Ghi WAL COMMIT
+        6. Append root vào roots.log
+        7. Ghi WAL COMMIT
         """
-        snap_id = str(int(time.time()))
+        # Tránh collision: timestamp + random 4 digits
+        snap_id = f"{int(time.time())}_{random.randint(1000, 9999)}"
         snap_dir_name = f"snapshot_{snap_id}"
         snap_full_path = os.path.join(self.snapshots_base, snap_dir_name)
         
@@ -65,8 +74,8 @@ class SnapshotManager:
             # 2. Walk directory
             # Sắp xếp để đảm bảo thứ tự file trong manifest là nhất quán (Canonical requirement)
             for root, dirs, files in os.walk(source_dir):
-                dirs.sort()
-                files.sort()
+                dirs.sort()  # Sort in-place để os.walk traverse theo thứ tự
+                files.sort()  # Sort files để đảm bảo canonical order
                 for file in files:
                     abs_path = os.path.join(root, file)
                     rel_path = os.path.relpath(abs_path, source_dir)
@@ -80,13 +89,13 @@ class SnapshotManager:
             with open(manifest_path, 'wb') as f:
                 f.write(canonical_json_dump(manifest))
 
-            # 4. Compute Merkle Root (Hash of canonical manifest)
-            # Trong thiết kế đơn giản này, root là hash của file manifest JSON
-            merkle_root = compute_sha256(canonical_json_dump(manifest))
+            # 4. Compute Merkle Root (True Merkle tree over files)
+            merkle_root = merkle_root_from_manifest(manifest)
 
-            # 5. Get Prev Root (Anti-rollback)
+            # 5. Get Prev Root và Prev Hash (Anti-rollback)
             prev_meta = self.get_latest_snapshot()
             prev_root = prev_meta['merkle_root'] if prev_meta else "0"*64
+            prev_hash = prev_meta['prev_hash'] if prev_meta else "0"*64
 
             # 6. Write Metadata
             metadata = {
@@ -99,7 +108,18 @@ class SnapshotManager:
             with open(os.path.join(snap_full_path, "metadata.json"), 'wb') as f:
                 f.write(canonical_json_dump(metadata))
             
-            # 7. Commit
+            # 7. Append root vào roots.log với hash chain (Anti-rollback + Anti-tamper)
+            # Format: ENTRY_HASH PREV_HASH ROOT
+            entry_content = f"{prev_hash} {merkle_root}"
+            entry_hash = compute_string_sha256(entry_content)
+            log_line = f"{entry_hash} {prev_hash} {merkle_root}\n"
+            
+            with open(self.roots_log_path, 'a') as f:
+                f.write(log_line)
+                f.flush()
+                os.fsync(f.fileno())
+            
+            # 8. Commit
             self.recovery.log_commit(snap_id)
             print(f"Snapshot {snap_id} created successfully. Root: {merkle_root[:12]}...")
             return snap_id
