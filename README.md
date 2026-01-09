@@ -1,560 +1,248 @@
-# Backup CLI - Secure Backup System
+# Backup CLI – Hệ thống sao lưu đảm bảo toàn vẹn dữ liệu
 
-Hệ thống backup dòng lệnh (CLI) an toàn cho Linux với các tính năng:
-- ✅ Toàn vẹn dữ liệu (Data Integrity)
-- ✅ Phát hiện chỉnh sửa trái phép (Tamper Detection)
-- ✅ Chống rollback (Rollback Protection)
-- ✅ An toàn khi crash (Crash Consistency)
-- ✅ Kiểm soát truy cập (Access Control)
-- ✅ Audit log có thể kiểm tra (Auditable)
+## 1. Giới thiệu
 
----
+Backup CLI là công cụ sao lưu dòng lệnh phục vụ mục tiêu bảo vệ toàn vẹn dữ liệu và khả năng kiểm chứng.
+Hệ thống tập trung phát hiện các hành vi tấn công phổ biến trên hệ thống backup như:
 
-## 📋 Yêu Cầu Hệ Thống
+- Sửa dữ liệu đã sao lưu (chunk tampering)
+- Sửa manifest / metadata
+- Rollback snapshot
+- Sửa hoặc xoá audit log
+- Crash giữa quá trình backup
 
-- **Hệ điều hành:** Linux (Ubuntu, WSL2)
-- **Python:** 3.6+
-- **Dependencies:** PyYAML
+Hệ thống không mã hóa dữ liệu, không nhắm tới bảo mật nội dung, mà tập trung vào integrity, auditability và crash recovery.
 
----
+## 2. Cài đặt và chạy chương trình
 
-## 🚀 Cài Đặt
+### 2.1. Yêu cầu môi trường
 
-### 1. Clone repository
+- Hệ điều hành: Linux (khuyến nghị WSL2)
+- Python: 3.10 trở lên
+- Không sử dụng thư viện ngoài chuẩn Python
 
-```bash
-git clone https://github.com/Chickyo/Backup_CLI
-cd Backup_CLI
+### 2.2. Cấu trúc thư mục chính
+
+```text
+.
+├── src/
+│   └── main.py
+├── store/
+│   ├── chunks/
+│   ├── snapshots/
+│   ├── roots.log
+│   ├── audit.log
+│   └── journal.log
+├── policy.yaml
+├── tests/
+└── README.md
 ```
 
-### 2. Cài đặt dependencies
+### 2.3. Các lệnh cơ bản
 
-```bash
-pip3 install -r requirements.txt
-```
-
-### 3. Cấu hình Policy (BẮT BUỘC)
-
-⚠️ **QUAN TRỌNG:** File `policy.yaml` nằm ở thư mục gốc của project (cùng cấp với thư mục `src/`). Code sẽ **tự động tìm** file này cho dù bạn chạy lệnh từ thư mục nào.
-
-**Bước 1: Kiểm tra username hiện tại**
-```bash
-whoami
-# Output: ubuntu (hoặc tên user của bạn)
-```
-
-**Bước 2: Sửa file policy.yaml**
-
-File `policy.yaml` nằm ở thư mục gốc project. Thêm username của bạn vào phần `users`:
-
-```yaml
-users:
-  alice: admin
-  bob: operator
-  eve: auditor
-  ubuntu: admin        # ← Thay 'ubuntu' bằng kết quả lệnh whoami
-  <your-username>: admin  # ← Hoặc thêm dòng này
-
-roles:
-  admin:
-    - init
-    - backup
-    - list-snapshots
-    - verify
-    - restore
-    - audit-verify
-  
-  operator:
-    - backup
-    - list-snapshots
-    - verify
-    - restore
-    - audit-verify
-
-  auditor:
-    - list-snapshots
-    - verify
-    - audit-verify
-```
-
-**Bước 3: Xác nhận file tồn tại**
-```bash
-# Kiểm tra file policy.yaml ở thư mục gốc project
-ls Backup_CLI/policy.yaml
-# Output: Backup_CLI/policy.yaml ✓
-```
-
-**Lưu ý:**
-- Code tự động tìm file `policy.yaml` ở thư mục gốc project (thư mục cha của `src/`)
-- Bạn có thể chạy lệnh CLI từ bất kỳ thư mục nào
-- Nếu file không tồn tại hoặc không đọc được → Lỗi: `ERROR: Policy file not found.`
-
----
-
-## 📁 Cấu Trúc Thư Mục
-
-```
-Backup_CLI/
-├── src/                    # Source code chính
-│   ├── main.py            # Entry point - điều phối CLI
-│   ├── audit.py           # Audit log với hash chain
-│   ├── integrity.py       # Verify integrity & rollback detection
-│   ├── policy.py          # Access control
-│   ├── recovery.py        # Crash recovery (WAL)
-│   ├── snapshot.py        # Snapshot management
-│   ├── storage.py         # Chunking & deduplication
-│   └── utils.py           # Utilities (hash, canonical JSON)
-│
-├── tests/                 # Test scripts
-│   ├── run_all_tests.sh   # Chạy tất cả tests
-│   ├── test_tamper.sh     # Test phát hiện sửa chunk
-│   ├── test_manifest_tamper.sh  # Test phát hiện sửa manifest
-│   ├── test_rollback.sh   # Test chống rollback
-│   ├── test_audit.sh      # Test audit log integrity
-│   ├── test_crash.sh      # Test crash recovery
-│   └── test_policy.py     # Test access control
-│
-├── dataset/               # Dữ liệu mẫu để backup (tự tạo)
-├── store/                 # Nơi lưu backup (tự động tạo)
-│   ├── chunks/           # Lưu các chunk theo hash
-│   ├── snapshots/        # Lưu metadata snapshot
-│   ├── journal.log       # Write-Ahead Log
-│   └── audit.log         # Audit log
-│
-├── policy.yaml           # Cấu hình access control
-├── requirements.txt      # Python dependencies
-└── README.md            
-```
-
----
-
-## 💻 Hướng Dẫn Sử Dụng
-
-⚠️ **Lưu ý:** 
-- Code tự động tìm file `policy.yaml` ở thư mục gốc project
-- Bạn có thể chạy lệnh từ bất kỳ thư mục nào (không nhất thiết phải ở `Backup_CLI/`)
-- Đảm bảo đã cấu hình username trong `policy.yaml`
-
-```bash
-# Ví dụ: Chạy từ thư mục gốc
-cd Backup_CLI/
-python3 -m src.main init store
-
-# Hoặc chạy từ thư mục khác
-cd /tmp
-python3 -m /path/to/Backup_CLI/src.main init store  # Vẫn hoạt động
-```
-
-### 1. Khởi tạo Backup Store
-
-```bash
-python3 -m src.main init <store_path>
-```
-
-**Ví dụ:**
 ```bash
 python3 -m src.main init store
-```
-
-Lệnh này tạo cấu trúc thư mục:
-- `store/chunks/` - Lưu trữ các chunk dữ liệu
-- `store/snapshots/` - Lưu metadata các snapshot
-
----
-
-### 2. Tạo Backup (Snapshot)
-
-```bash
-python3 -m src.main backup <source_directory> --label "<description>"
-```
-
-**Ví dụ:**
-```bash
-# Tạo dữ liệu mẫu
-mkdir -p dataset/images
-echo "Important data" > dataset/file.txt
-echo "Secret" > dataset/images/photo.jpg
-
-# Backup
-python3 -m src.main backup dataset --label "First backup"
-```
-
-**Quá trình backup:**
-1. Ghi `BEGIN` vào journal.log (WAL)
-2. Chia file thành chunks (1MB)
-3. Hash mỗi chunk (SHA-256)
-4. Lưu chunk vào `store/chunks/<hash>`
-5. Tạo manifest.json (mapping file → chunks)
-6. Tính Merkle root từ manifest
-7. Lưu metadata (id, timestamp, merkle_root, prev_root)
-8. Ghi `COMMIT` vào journal.log
-9. Ghi vào audit.log
-
----
-
-### 3. Liệt Kê Snapshots
-
-```bash
+python3 -m src.main backup <source_dir> --label "My Backup"
 python3 -m src.main list-snapshots
-```
-
-**Output:**
-```
-ID              TIMESTAMP
-------------------------------
-1735948800
-1735952400
-```
-
----
-
-### 4. Verify Snapshot
-
-```bash
 python3 -m src.main verify <snapshot_id>
-```
-
-**Ví dụ:**
-```bash
-python3 -m src.main verify 1735948800
-```
-
-**Kiểm tra:**
-- ✅ Tính lại Merkle root từ manifest → so sánh metadata
-- ✅ Kiểm tra tất cả chunk tồn tại và đúng hash
-- ✅ Kiểm tra chuỗi prev_root (chống rollback)
-
----
-
-### 5. Restore Snapshot
-
-```bash
-python3 -m src.main restore <snapshot_id> <target_directory>
-```
-
-**Ví dụ:**
-```bash
-python3 -m src.main restore 1735948800 restored_data
-```
-
-**Lưu ý:** Restore tự động verify trước khi khôi phục.
-
----
-
-### 6. Verify Audit Log
-
-```bash
+python3 -m src.main restore <snapshot_id> <output_dir>
 python3 -m src.main audit-verify
 ```
 
-**Kiểm tra:**
-- ✅ Hash chain của audit log
-- ✅ Mỗi entry có prev_hash trỏ đúng entry trước
-- ✅ Entry hash khớp với nội dung
+## 3. Chunk size, Canonical Manifest và Merkle Root
 
----
+### 3.1. Chunking
 
-## 🧪 Chạy Tests
+- Kích thước chunk cố định: 1 MiB
+- Mỗi chunk được hash bằng SHA-256
+- Chunk được lưu tại: `store/chunks/<chunk_hash>`
+- Deduplication được thực hiện tự nhiên thông qua hash: các chunk trùng nội dung chỉ lưu một lần.
 
-### Chạy tất cả tests
+### 3.2. Canonical Manifest
 
-```bash
-bash tests/run_all_tests.sh
+Mỗi snapshot chứa file manifest.json, ánh xạ đường dẫn file tương đối tới danh sách các chunk hash:
+
+```json
+{
+  "path/to/file.txt": [
+    "chunk_hash_1",
+    "chunk_hash_2"
+  ]
+}
 ```
 
-### Chạy từng test riêng lẻ
+Manifest được ghi dưới dạng canonical JSON:
 
-```bash
-# Test phát hiện sửa chunk
-bash tests/test_tamper.sh
+- Key được sort
+- Không thừa khoảng trắng
+- Serialize ổn định
 
-# Test phát hiện sửa manifest
-bash tests/test_manifest_tamper.sh
+Điều này đảm bảo rằng cùng một nội dung dữ liệu sẽ luôn tạo ra cùng một hash, không phụ thuộc thứ tự duyệt file.
 
-# Test chống rollback
-bash tests/test_rollback.sh
+### 3.3. Tính Merkle Root
 
-# Test audit log integrity
-bash tests/test_audit.sh
+Merkle root được tính từ toàn bộ nội dung manifest.json và được lưu trong metadata.json:
 
-# Test crash recovery
-bash tests/test_crash.sh
-
-# Test access control
-python3 tests/test_policy.py
+```json
+{
+  "id": "<snapshot_id>",
+  "timestamp": 1234567890.0,
+  "label": "Backup name",
+  "merkle_root": "<hex>",
+  "prev_root": "<hex>"
+}
 ```
 
----
+Khi verify snapshot:
 
-## 🔒 Các Tính Năng Bảo Mật
+- Đọc manifest và metadata
+- Tính lại Merkle root từ manifest
+- So sánh với metadata.merkle_root
+- Hash lại từng chunk để phát hiện sửa đổi dữ liệu
 
-### 1. **Data Integrity (Toàn vẹn dữ liệu)**
+## 4. Cơ chế chống rollback snapshot
 
-- **Chunking:** File được chia thành chunks 1MB
-- **Content-Addressable Storage:** Mỗi chunk lưu theo hash (SHA-256)
-- **Merkle Tree:** Manifest được hash thành Merkle root
-- **Verify:** So sánh Merkle root và hash từng chunk
+### 4.1. Nguyên lý
 
-**Tấn công bị phát hiện:**
+- Mỗi snapshot lưu prev_root
+- File roots.log là một hash chain, mỗi dòng có dạng: `ENTRY_HASH PREV_HASH ROOT`
+- Trong đó: `ENTRY_HASH = H(PREV_HASH || ROOT)`
+- Bất kỳ thao tác xóa, chèn hoặc thay đổi thứ tự snapshot đều làm đứt hash chain và bị phát hiện khi verify.
+
+### 4.2. Reproduce test rollback
+
 ```bash
-# Sửa 1 byte trong chunk → verify FAIL
-echo "hacked" >> store/chunks/<hash>
-python3 -m src.main verify <snapshot_id>  # FAIL
-```
+# Init store
+python3 -m src.main init store
 
----
+# Tạo snapshot cũ
+echo "Data 1" > file.txt
+python3 -m src.main backup . --label "Old Snapshot"
+SNAP_OLD=$(python3 -m src.main list-snapshots | tail -n 1)
 
-### 2. **Tamper Detection (Phát hiện sửa đổi)**
-
-- Sửa chunk → hash không khớp
-- Sửa manifest.json → Merkle root không khớp
-- Sửa metadata.json → Verify fail
-
----
-
-### 3. **Rollback Protection (Chống rollback)**
-
-- Mỗi snapshot lưu `prev_root` (Merkle root của snapshot trước)
-- Verify kiểm tra chuỗi prev_root
-- Nếu thay thế snapshot cũ → chain bị đứt → phát hiện
-
-**Ví dụ tấn công:**
-```bash
-# Xóa snapshot giữa → verify snapshot sau sẽ FAIL
-rm -rf store/snapshots/snapshot_<old_id>
-python3 -m src.main verify <new_id>  # FAIL: prev_root không khớp
-```
-
----
-
-### 4. **Crash Consistency (An toàn crash)**
-
-- **Write-Ahead Log (WAL):** Ghi `BEGIN` trước, `COMMIT` sau
-- **Recovery:** Khi khởi động, scan journal.log
-- **Rollback:** Snapshot chưa commit bị xóa tự động
-
-**Giả lập crash:**
-```bash
-# Giữa quá trình backup, kill process
-python3 -m src.main backup dataset --label "Test" &
-PID=$!
+# Tạo snapshot mới
 sleep 1
-kill -9 $PID
+echo "Data 2" > file.txt
+python3 -m src.main backup . --label "New Snapshot"
+SNAP_NEW=$(python3 -m src.main list-snapshots | tail -n 1)
 
-# Chạy lệnh khác → recovery tự động
-python3 -m src.main list-snapshots  # Snapshot lỗi không xuất hiện
+# Tấn công rollback
+rm -rf store/snapshots/snapshot_$SNAP_NEW/*
+cp -r store/snapshots/snapshot_$SNAP_OLD/* store/snapshots/snapshot_$SNAP_NEW/
+
+# Verify
+python3 -m src.main verify $SNAP_NEW
 ```
 
----
+Kết quả mong đợi: VERIFY FAIL – rollback detected.
 
-### 5. **Access Control (Kiểm soát truy cập)**
+## 5. Journal / WAL và phục hồi crash
 
-- Dựa trên OS username
-- Policy được định nghĩa trong `policy.yaml`
-- User không có quyền → lệnh bị từ chối + ghi audit log DENY
+### 5.1. Journal (Write-Ahead Log)
 
-**Ví dụ:**
+File journal.log ghi nhận trạng thái backup:
+
+- BEGIN <snapshot_id>
+- COMMIT <snapshot_id>
+
+Luồng backup an toàn:
+
+- Ghi BEGIN
+- Ghi chunk, manifest, metadata
+- Append roots.log
+- Ghi COMMIT
+
+### 5.2. Phục hồi crash
+
+Khi chương trình khởi động:
+
+- Quét journal.log
+- Snapshot nào có BEGIN nhưng không có COMMIT sẽ bị xem là snapshot dở và bị xoá
+
+Reproduce crash test:
+
+```bash
+echo "BEGIN 9999999999" >> store/journal.log
+mkdir store/snapshots/snapshot_9999999999
+python3 -m src.main list-snapshots
+```
+
+Snapshot giả sẽ bị cleanup tự động.
+
+## 6. Policy enforcement (policy.yaml)
+
+### 6.1. Schema
+
 ```yaml
 users:
-  alice: admin
-  bob: auditor
+  username:
+    role: role_name
+
+roles:
+  role_name:
+    allow:
+      - command1
+      - command2
+```
+
+### 6.2. Ví dụ
+
+```yaml
+users:
+  admin:
+    role: admin
+  operator:
+    role: operator
+  auditor:
+    role: auditor
 
 roles:
   admin:
-    - init
-    - backup
-    - verify
+    allow: [init, backup, restore, verify, audit-verify]
+  operator:
+    allow: [backup, restore, verify]
   auditor:
-    - verify
-    - list-snapshots
+    allow: [verify, audit-verify]
 ```
 
-```bash
-# User bob chạy init → DENY
-python3 -m src.main init store  # PERMISSION DENIED
-```
+Nếu user không có quyền thực thi lệnh:
 
----
+- Lệnh bị từ chối
+- Audit log ghi trạng thái DENY
 
-### 6. **Audit Log (Nhật ký kiểm toán)**
+## 7. Audit log và audit-verify
 
-- **Append-only:** Chỉ ghi thêm, không sửa
-- **Hash chain:** Mỗi entry chứa hash entry trước
-- **Format:**
-  ```
-  ENTRY_HASH PREV_HASH TIMESTAMP USER COMMAND ARGS_HASH STATUS
-  ```
+### 7.1. Định dạng audit log
 
-**Verify audit log:**
+Mỗi dòng trong audit.log:
+
+- ENTRY_HASH PREV_HASH UNIX_MS USER COMMAND ARGS_SHA256 STATUS
+
+### 7.2. Cách tính hash
+
+ENTRY_HASH = H(PREV_HASH || UNIX_MS || USER || COMMAND || ARGS_SHA256 || STATUS)
+
+Audit log là append-only hash chain, mọi sửa đổi đều bị phát hiện.
+
+### 7.3. Verify audit log
+
 ```bash
 python3 -m src.main audit-verify
-# Output: AUDIT OK. Head Hash: abc123...
 ```
 
-**Tấn công bị phát hiện:**
-```bash
-# Sửa 1 ký tự trong audit.log
-sed -i 's/backup/hacked/' store/audit.log
-python3 -m src.main audit-verify  # AUDIT CORRUPTED
-```
+## 8. Xác định USER từ hệ điều hành
 
----
+Chương trình xác định user theo thứ tự ưu tiên:
 
-## 🎯 Workflow Ví Dụ
+- Biến môi trường SUDO_USER (nếu chạy bằng sudo)
+- User hiện tại của hệ điều hành (getpass.getuser())
 
-### Scenario 1: Backup và Restore
+Cách này đảm bảo audit log ghi đúng người thực sự thao tác.
 
-```bash
-# 1. Khởi tạo
-python3 -m src.main init store
+## 9. Giới hạn hệ thống
 
-# 2. Tạo dữ liệu
-mkdir -p dataset/docs
-echo "Project proposal" > dataset/docs/proposal.txt
-echo "Budget sheet" > dataset/docs/budget.xlsx
-
-# 3. Backup lần 1
-python3 -m src.main backup dataset --label "Initial backup"
-
-# 4. Thay đổi dữ liệu
-echo "Updated proposal" > dataset/docs/proposal.txt
-rm dataset/docs/budget.xlsx
-echo "Timeline" > dataset/docs/timeline.txt
-
-# 5. Backup lần 2
-python3 -m src.main backup dataset --label "After updates"
-
-# 6. List snapshots
-python3 -m src.main list-snapshots
-
-# 7. Restore về phiên bản cũ
-SNAP_ID=$(python3 -m src.main list-snapshots | tail -n 2 | head -n 1)
-python3 -m src.main restore $SNAP_ID restored_old
-
-# 8. Kiểm tra
-ls restored_old/docs/
-# Output: proposal.txt  budget.xlsx (version cũ)
-```
-
----
-
-### Scenario 2: Phát hiện tấn công
-
-```bash
-# 1. Tạo backup
-python3 -m src.main backup dataset --label "Clean"
-SNAP_ID=$(python3 -m src.main list-snapshots | tail -n 1)
-
-# 2. Verify OK
-python3 -m src.main verify $SNAP_ID
-# Output: VERIFY OK
-
-# 3. Kẻ tấERROR: Policy file 'policy.yaml' not found"
-
-**Nguyên nhân:** File `policy.yaml` bị xóa hoặc không có quyền đọc.
-
-**Giải pháp:**
-```bash
-# 1. Kiểm tra file có tồn tại không
-ls /path/to/Backup_CLI/policy.yaml
-
-# 2. Nếu bị mất, tạo lại
-cd /path/to/Backup_CLI
-cat > policy.yaml << EOF
-users:
-  $(whoami): admin
-
-roles:
-  admin:
-    - init
-    - backup
-    - list-snapshots
-    - verify
-    - restore
-    - audit-verify
-  
-  operator:
-    - backup
-    - list-snapshots: User 'xxx' cannot run 'yyy'"
-
-**Nguyên nhân:** Username của bạn chưa có trong `policy.yaml` hoặc role không có quyền.
-
-**Giải pháp:**
-```bash
-# 1. Kiểm tra username hiện tại
-whoami
-# Output: ubuntu
-
-# 2. Mở file policy.yaml
-nano policy.yaml
-
-# 3. Thêm user vào (nếu chưa có)
-users:
-  ubuntu: admin     # ← Thay 'ubuntu' bằng username của bạn
-
-# 4. Hoặc chạy với sudo (username sẽ lấy từ SUDO_USER)
-
-  auditor:
-    - list-snapshots
-    - verifyl
-
-# Nếu không có, tạo mới
-cat > policy.yaml << EOF
-users:
-  $(whoami): admin
-
-roles:
-  admin:
-    - init
-    - backup
-    - list-snapshots
-    - verify
-    - restore
-    - audit-verify
-EOF
-```
-
-### Lỗi: "PERMISSION DENIED"
-```bash
-# Thêm user vào policy.yaml
-# hoặc chạy với sudo
-sudo python3 -m src.main <command>
-```
-
-### Lỗi: "Store not found"
-```bash
-# Đảm bảo đã init store trước
-python3 -m src.main init store
-```
-
----
-
-## 📚 Thiết Kế Kỹ Thuật
-
-### Snapshot Structure
-```
-store/snapshots/snapshot_<id>/
-├── manifest.json       # { "file1.txt": ["chunk_hash1", "chunk_hash2"], ... }
-└── metadata.json       # { id, timestamp, label, merkle_root, prev_root }
-```
-
-### Chunk Storage
-```
-store/chunks/
-└── <sha256_hash>      # Binary content của chunk
-```
-
-### Journal Log (WAL)
-```
-BEGIN 1735948800
-COMMIT 1735948800
-BEGIN 1735952400
-COMMIT 1735952400
-```
-
-### Audit Log
-```
-entry_hash prev_hash timestamp user command args_hash status
-abc123...  000000... 1735948800000 alice init d41d8c... OK
-def456...  abc123... 1735949000000 alice backup 9e107d... OK
-```
+- Không mã hóa dữ liệu
+- Không chống admin chỉnh sửa policy hoặc source code
+- Không hỗ trợ nhiều tiến trình ghi song song
+- Không chống rollback cấp thiết bị
+- Không bảo vệ khỏi xóa toàn bộ thư mục store
