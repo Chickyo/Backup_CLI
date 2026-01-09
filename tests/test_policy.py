@@ -97,7 +97,7 @@ class TestPolicy(unittest.TestCase):
         
         has_denial = "PERMISSION DENIED" in result.stdout
         if result.returncode != 0 and has_denial:
-            print(f"{GREEN}PASS: Auditor bị từ chối init (đúng như mong đợi){NC}")
+            print(f"{GREEN}PASS: Auditor bị từ chối init{NC}")
         else:
             print(f"{RED}FAIL: Auditor không bị chặn đúng cách{NC}")
         
@@ -154,7 +154,7 @@ class TestPolicy(unittest.TestCase):
         
         has_denial = "PERMISSION DENIED" in result.stdout
         if result.returncode != 0 and has_denial:
-            print(f"{GREEN}PASS: Operator bị từ chối init (đúng như mong đợi){NC}")
+            print(f"{GREEN}PASS: Operator bị từ chối init{NC}")
         else:
             print(f"{RED}FAIL: Operator không bị chặn init{NC}")
         
