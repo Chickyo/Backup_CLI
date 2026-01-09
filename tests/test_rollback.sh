@@ -11,30 +11,50 @@ echo "=== TEST ROLLBACK PROTECTION ==="
 rm -rf store dataset_rollback
 mkdir -p dataset_rollback
 
-# 1. Tạo Snapshot 1
-echo "Data 1" > dataset_rollback/file.txt
+# 1. Tạo Snapshot cũ (Old)
+echo "Old Data" > dataset_rollback/file.txt
 python3 -m src.main init store > /dev/null
-python3 -m src.main backup dataset_rollback --label "Snap 1" > /dev/null
-SNAP1=$(python3 -m src.main list-snapshots | tail -n 1)
+python3 -m src.main backup dataset_rollback --label "Old Snapshot" > /dev/null
+SNAP_OLD=$(python3 -m src.main list-snapshots | tail -n 1)
+echo " -> Created Old Snapshot: $SNAP_OLD"
+
+# Backup snapshot cũ
+cp -r "store/snapshots/snapshot_$SNAP_OLD" "store/snapshots/snapshot_${SNAP_OLD}_backup"
+
 sleep 1 # Đợi 1s để timestamp khác nhau
 
-# 2. Tạo Snapshot 2
-echo "Data 2" > dataset_rollback/file.txt
-python3 -m src.main backup dataset_rollback --label "Snap 2" > /dev/null
-SNAP2=$(python3 -m src.main list-snapshots | tail -n 1)
+# 2. Tạo Snapshot mới (New)
+echo "New Data - Updated" > dataset_rollback/file.txt
+python3 -m src.main backup dataset_rollback --label "New Snapshot" > /dev/null
+SNAP_NEW=$(python3 -m src.main list-snapshots | tail -n 1)
+echo " -> Created New Snapshot: $SNAP_NEW"
 
-echo " -> Created Snap 1: $SNAP1"
-echo " -> Created Snap 2: $SNAP2"
+# 3. Verify snapshot mới (Phải OK)
+echo ""
+echo "[Before Attack] Verify snapshot mới - Mong đợi: OK..."
+python3 -m src.main verify $SNAP_NEW
 
-# 3. Tấn công: Sửa prev_root của Snap 2
-# Giả lập kẻ tấn công cố tình trỏ prev_root của Snap 2 về 0 (như thể nó là snap đầu tiên)
-# hoặc sửa thành hash rác.
-echo "[Attack] Sửa đổi metadata của Snapshot 2 (phá vỡ chain)..."
-META_PATH="store/snapshots/snapshot_$SNAP2/metadata.json"
+# 4. Tấn công: ROLLBACK - Thay thế snapshot mới bằng snapshot cũ
+echo ""
+echo "[ROLLBACK ATTACK] Thay thế snapshot mới ($SNAP_NEW) bằng snapshot cũ ($SNAP_OLD)..."
 
-# Thay prev_root thật bằng một chuỗi fake
-sed -i 's/"prev_root":"[a-f0-9]*"/"prev_root":"deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"/' "$META_PATH"
 
-# 4. Verify Snap 2 (Phải FAIL do lệch prev_root với root của Snap 1)
-echo "Running Verify..."
-python3 -m src.main verify $SNAP2;
+rm -rf "store/snapshots/snapshot_$SNAP_NEW"
+cp -r "store/snapshots/snapshot_${SNAP_OLD}_backup" "store/snapshots/snapshot_$SNAP_NEW"
+
+# 5. Verify snapshot sau khi rollback (Phải FAIL)
+echo ""
+echo "[After Attack] Verify snapshot $SNAP_NEW - Mong đợi: FAIL (rollback detected)..."
+OUTPUT=$(python3 -m src.main verify $SNAP_NEW 2>&1)
+echo "$OUTPUT"
+
+# 6. Kiểm tra kết quả
+echo ""
+if echo "$OUTPUT" | grep -q "VERIFY FAIL"; then
+    echo -e "${GREEN}✓ PASS: Hệ thống phát hiện được ROLLBACK ATTACK!${NC}"
+else
+    echo -e "${RED}✗ FAIL: Không phát hiện được rollback attack${NC}"
+fi
+
+echo ""
+echo "=== KẾT THÚC TEST ROLLBACK ==="

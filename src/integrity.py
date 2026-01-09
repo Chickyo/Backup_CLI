@@ -39,6 +39,12 @@ class IntegrityManager:
         try:
             manifest, metadata = self.load_snapshot(snap_id)
             
+            # 0. CRITICAL: Kiểm tra snapshot_id trong metadata phải khớp với folder name
+            if metadata['id'] != snap_id:
+                print(f"VERIFY FAIL: Snapshot ID mismatch! Folder name is '{snap_id}' "
+                      f"but metadata.json has ID '{metadata['id']}' (rollback attack detected)!")
+                return False
+            
             # 1. Recompute Merkle (true Merkle tree over files)
             cal_root = merkle_root_from_manifest(manifest)
             if cal_root != metadata['merkle_root']:
@@ -79,25 +85,32 @@ class IntegrityManager:
             print("Verifying roots.log hash chain...")
             from .utils import compute_string_sha256
             prev_hash = "0" * 64
-            roots_dict = {}  # Map root -> (index, prev_root) để O(1) lookup
+            roots_dict = {}  # Map root -> (index, snap_id, prev_root) để O(1) lookup
             
             for idx, line in enumerate(lines):
                 parts = line.split()
-                if len(parts) != 3:
+                # Support cả format cũ (3 parts) và mới (4 parts)
+                if len(parts) == 3:
+                    # Old format: ENTRY_HASH PREV_HASH ROOT
+                    entry_hash, logged_prev_hash, root = parts
+                    snap_id_in_log = None
+                    expected_content = f"{prev_hash} {root}"
+                elif len(parts) == 4:
+                    # New format: ENTRY_HASH PREV_HASH SNAPSHOT_ID ROOT
+                    entry_hash, logged_prev_hash, snap_id_in_log, root = parts
+                    expected_content = f"{prev_hash} {snap_id_in_log} {root}"
+                else:
                     print(f"VERIFY FAIL: Invalid roots.log format at line {idx+1}")
                     return False
                 
-                entry_hash, logged_prev_hash, root = parts
-                
                 # Verify hash chain
-                expected_content = f"{prev_hash} {root}"
                 expected_hash = compute_string_sha256(expected_content)
                 if entry_hash != expected_hash:
                     print(f"VERIFY FAIL: roots.log hash chain broken at line {idx+1}")
                     return False
                 
                 # Store trong dict để lookup nhanh
-                roots_dict[root] = (idx, logged_prev_hash)
+                roots_dict[root] = (idx, snap_id_in_log, logged_prev_hash)
                 prev_hash = entry_hash
             
             # Snapshot phải có root trong roots.log
@@ -106,14 +119,41 @@ class IntegrityManager:
                 return False
             
             # Kiểm tra prev_root chain
-            root_index, _ = roots_dict[metadata['merkle_root']]
+            root_index, snap_id_in_log, _ = roots_dict[metadata['merkle_root']]
+            
+            # DEBUG
+            # print(f"[DEBUG] Metadata ID: {metadata['id']}, Merkle root index: {root_index}, ID in log: {snap_id_in_log}")
+            
+            # CRITICAL: Nếu roots.log có snapshot_id, phải khớp với metadata
+            if snap_id_in_log is not None and snap_id_in_log != metadata['id']:
+                print(f"VERIFY FAIL: Snapshot ID mismatch! Metadata has '{metadata['id']}' "
+                      f"but roots.log has '{snap_id_in_log}' for this merkle_root (rollback attack)!")
+                return False
+            
             if metadata['prev_root'] != "0"*64:  # Không phải snapshot đầu tiên
                 if root_index == 0:
                     print("VERIFY FAIL: First snapshot cannot have non-zero prev_root!")
                     return False
-                # Lấy root trước đó từ lines
+                
+                # Kiểm tra prev_root có trong roots.log không
+                if metadata['prev_root'] not in roots_dict:
+                    print("VERIFY FAIL: prev_root not found in roots.log (rollback attack)!")
+                    return False
+                
+                prev_root_index, _, _ = roots_dict[metadata['prev_root']]
+                
+                # CRITICAL: prev_root phải ở vị trí LIỀN TRƯỚC trong roots.log
+                if prev_root_index != root_index - 1:
+                    print(f"VERIFY FAIL: Rollback detected! prev_root at position {prev_root_index}, "
+                          f"but current root at position {root_index} (expected consecutive)")
+                    return False
+                
+                # Double check: Lấy root trước đó từ lines
                 prev_line_parts = lines[root_index - 1].split()
-                prev_root_in_log = prev_line_parts[2]
+                if len(prev_line_parts) == 3:
+                    prev_root_in_log = prev_line_parts[2]
+                else:  # len == 4
+                    prev_root_in_log = prev_line_parts[3]
                 if prev_root_in_log != metadata['prev_root']:
                     print("VERIFY FAIL: prev_root chain broken!")
                     return False

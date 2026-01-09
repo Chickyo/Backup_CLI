@@ -1,9 +1,9 @@
 #!/bin/bash
 chmod +x tests/*.sh
 
-echo "========================================"
-echo "RUNNING ALL TESTS FOR BACKUP CLI PROJECT"
-echo "========================================"
+echo "=================="
+echo "RUNNING ALL TESTS"
+echo "=================="
 
 ./tests/test_tamper.sh
 echo "----------------------------------------"

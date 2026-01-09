@@ -2,7 +2,7 @@
 # tests/generate_dataset.sh
 # Script sinh 2000 files với dữ liệu ngẫu nhiên vào dataset_test
 
-echo "=== GENERATING 2000 FILES ==="
+echo "=== GENERATING 2000 FILES IN dataset_test ==="
 
 # Xóa thư mục cũ nếu tồn tại
 rm -rf dataset_test

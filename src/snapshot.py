@@ -37,15 +37,21 @@ class SnapshotManager:
         if not lines:
             return None
         
-        # Parse dòng cuối: ENTRY_HASH PREV_HASH ROOT
+        # Parse dòng cuối: ENTRY_HASH PREV_HASH [SNAPSHOT_ID] ROOT
         last_line = lines[-1]
         parts = last_line.split()
-        if len(parts) != 3:
+        if len(parts) == 3:
+            # Old format: ENTRY_HASH PREV_HASH ROOT
+            entry_hash, prev_hash, merkle_root = parts
+        elif len(parts) == 4:
+            # New format: ENTRY_HASH PREV_HASH SNAPSHOT_ID ROOT
+            entry_hash, prev_hash, snap_id, merkle_root = parts
+        else:
             return None
         
         return {
-            'merkle_root': parts[2],
-            'prev_hash': parts[0]
+            'merkle_root': merkle_root,
+            'prev_hash': entry_hash  # Entry hash của snapshot này sẽ là prev_hash của snapshot tiếp theo
         }
 
     def create_snapshot(self, source_dir, label):
@@ -109,10 +115,10 @@ class SnapshotManager:
                 f.write(canonical_json_dump(metadata))
             
             # 7. Append root vào roots.log với hash chain (Anti-rollback + Anti-tamper)
-            # Format: ENTRY_HASH PREV_HASH ROOT
-            entry_content = f"{prev_hash} {merkle_root}"
+            # Format: ENTRY_HASH PREV_HASH SNAPSHOT_ID ROOT
+            entry_content = f"{prev_hash} {snap_id} {merkle_root}"
             entry_hash = compute_string_sha256(entry_content)
-            log_line = f"{entry_hash} {prev_hash} {merkle_root}\n"
+            log_line = f"{entry_hash} {prev_hash} {snap_id} {merkle_root}\n"
             
             with open(self.roots_log_path, 'a') as f:
                 f.write(log_line)
