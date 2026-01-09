@@ -1,7 +1,12 @@
 #!/bin/bash
 # tests/test_tamper.sh
 
-echo "=== TEST TAMPERING (Sửa đổi dữ liệu trái phép) ==="
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+NC='\033[0m'
+
+
+echo "=== TEST TAMPERING ==="
 
 # 1. Setup môi trường
 rm -rf store dataset_tamper
@@ -30,7 +35,15 @@ echo "HACKED" >> "$CHUNK_FILE"
 
 # 5. Verify lần 2 (Phải FAIL)
 echo "[4] Verify sau khi sửa chunk (Mong đợi: FAIL)..."
-python3 -m src.main verify $SNAP_ID;
+OUTPUT=$(python3 -m src.main verify $SNAP_ID);
+
+# 6. Kiểm tra kết quả
+echo "$OUTPUT"
+if echo "$OUTPUT" | grep -q "VERIFY FAIL"; then
+    echo -e "${GREEN}PASS: Hệ thống phát hiện được sửa đổi chunk!${NC}"
+else
+    echo -e "${RED}FAIL: Không phát hiện được sửa đổi chunk${NC}"
+fi
 
 # Cleanup
 # rm -rf store dataset_tamper

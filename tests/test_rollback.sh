@@ -38,7 +38,6 @@ python3 -m src.main verify $SNAP_NEW
 echo ""
 echo "[ROLLBACK ATTACK] Thay thế snapshot mới ($SNAP_NEW) bằng snapshot cũ ($SNAP_OLD)..."
 
-
 rm -rf "store/snapshots/snapshot_$SNAP_NEW"
 cp -r "store/snapshots/snapshot_${SNAP_OLD}_backup" "store/snapshots/snapshot_$SNAP_NEW"
 

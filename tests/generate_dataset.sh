@@ -46,4 +46,3 @@ TOTAL_SIZE=$(du -sh dataset_test | cut -f1)
 
 echo "=== GENERATION COMPLETE ==="
 echo "Total files: $TOTAL_FILES"
-echo "Total size: $TOTAL_SIZE"

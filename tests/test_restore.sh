@@ -49,7 +49,6 @@ cp -r dataset_test dataset_test_original
 ORIGINAL_COUNT=$(find dataset_test_original -type f | wc -l)
 echo " -> Original file count: $ORIGINAL_COUNT"
 
-# QUAN TRỌNG: cd vào trong thư mục để checksum không chứa tên thư mục gốc
 echo "[3] Computing checksums of original files..."
 (cd dataset_test_original && find . -type f -exec sha256sum {} \;) | sort > /tmp/checksums_original.txt
 

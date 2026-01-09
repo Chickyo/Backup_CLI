@@ -11,3 +11,5 @@ cách encode để đảm bảo không thay đổi giữa các lần chạy
 
 Chuyển CRLF sang LF:
 wsl bash -c "find src tests -type f \( -name '*.py' -o -name '*.sh' -o -name '*.txt' -o -name '*.yaml' -o -name '*.yml' -o -name '*.md' \) -exec sed -i 's/\r$//' {} \;"
+Chuyển LF sang CRLF:
+wsl bash -c "find src tests -type f \( -name '*.py' -o -name '*.sh' -o -name '*.txt' -o -name '*.yaml' -o -name '*.yml' -o -name '*.md' \) -exec sed -i 's/$/\r/' {} \;"
