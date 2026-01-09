@@ -69,7 +69,11 @@ roles:
         print("[PASS] Auditor denial test")
 
 if __name__ == '__main__':
+
     # Cleanup store tạm nếu có
     if os.path.exists("store"):
         shutil.rmtree("store")
+    print("========================================")
+    print("=== TEST POLICY ===")
+    print("========================================")
     unittest.main()

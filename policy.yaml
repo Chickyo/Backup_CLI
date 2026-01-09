@@ -3,8 +3,7 @@ users:
   bob: operator
   eve: auditor
   Chicky: admin
-  chicky: admin
-
+  ubuntu: admin
 
 roles:
   admin:

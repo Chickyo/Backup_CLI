@@ -4,14 +4,14 @@
 echo "=== TEST TAMPERING (Sửa đổi dữ liệu trái phép) ==="
 
 # 1. Setup môi trường
-rm -rf store dataset_test
-mkdir -p dataset_test
-echo "Original Content" > dataset_test/secret.txt
+rm -rf store dataset_tamper
+mkdir -p dataset_tamper
+echo "Original Content" > dataset_tamper/secret.txt
 
 # 2. Init & Backup
 echo "[1] Init và Backup dữ liệu gốc..."
 python3 -m src.main init store > /dev/null
-python3 -m src.main backup dataset_test --label "Clean Backup" > /dev/null
+python3 -m src.main backup dataset_tamper --label "Clean Backup" > /dev/null
 
 # Lấy ID snapshot vừa tạo (dòng cuối cùng của list)
 SNAP_ID=$(python3 -m src.main list-snapshots | tail -n 1)
@@ -33,5 +33,5 @@ echo "[4] Verify sau khi sửa chunk (Mong đợi: FAIL)..."
 python3 -m src.main verify $SNAP_ID;
 
 # Cleanup
-# rm -rf store dataset_test
+# rm -rf store dataset_tamper
 echo "=== KẾT THÚC TEST TAMPER ==="

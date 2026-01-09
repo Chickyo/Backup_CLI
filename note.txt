@@ -1,0 +1,13 @@
+Script generate, restore
+Policy & audit log
+test_rollback.sh
+README 
+REPORT
+
+Tính  Merkle root
+4.3. Canonical manifest và Merkle root
+Canonical encoding: nhóm chọn JSON hoặc YAML nhưng phải mô tả rõ trong README
+cách encode để đảm bảo không thay đổi giữa các lần chạy
+
+Chuyển CRLF sang LF:
+wsl bash -c "find src tests -type f \( -name '*.py' -o -name '*.sh' -o -name '*.txt' -o -name '*.yaml' -o -name '*.yml' -o -name '*.md' \) -exec sed -i 's/\r$//' {} \;"

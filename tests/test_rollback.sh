@@ -8,19 +8,19 @@ NC='\033[0m'
 echo "=== TEST ROLLBACK PROTECTION ==="
 
 # Setup môi trường
-rm -rf store dataset_rb
-mkdir -p dataset_rb
+rm -rf store dataset_rollback
+mkdir -p dataset_rollback
 
 # 1. Tạo Snapshot 1
-echo "Data 1" > dataset_rb/file.txt
+echo "Data 1" > dataset_rollback/file.txt
 python3 -m src.main init store > /dev/null
-python3 -m src.main backup dataset_rb --label "Snap 1" > /dev/null
+python3 -m src.main backup dataset_rollback --label "Snap 1" > /dev/null
 SNAP1=$(python3 -m src.main list-snapshots | tail -n 1)
 sleep 1 # Đợi 1s để timestamp khác nhau
 
 # 2. Tạo Snapshot 2
-echo "Data 2" > dataset_rb/file.txt
-python3 -m src.main backup dataset_rb --label "Snap 2" > /dev/null
+echo "Data 2" > dataset_rollback/file.txt
+python3 -m src.main backup dataset_rollback --label "Snap 2" > /dev/null
 SNAP2=$(python3 -m src.main list-snapshots | tail -n 1)
 
 echo " -> Created Snap 1: $SNAP1"
