@@ -32,5 +32,3 @@ else
     echo -e "${RED}FAIL: Snapshot lỗi vẫn còn tồn tại!${NC}"
     exit 1
 fi
-
-rm -rf store

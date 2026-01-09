@@ -7,7 +7,8 @@ NC='\033[0m'
 
 echo "=== TEST ROLLBACK PROTECTION ==="
 
-rm -rf store
+# Setup môi trường
+rm -rf store dataset_rb
 mkdir -p dataset_rb
 
 # 1. Tạo Snapshot 1
@@ -37,5 +38,3 @@ sed -i 's/"prev_root":"[a-f0-9]*"/"prev_root":"deadbeefdeadbeefdeadbeefdeadbeefd
 # 4. Verify Snap 2 (Phải FAIL do lệch prev_root với root của Snap 1)
 echo "Running Verify..."
 python3 -m src.main verify $SNAP2;
-
-rm -rf store dataset_rb

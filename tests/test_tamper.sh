@@ -4,7 +4,7 @@
 echo "=== TEST TAMPERING (Sửa đổi dữ liệu trái phép) ==="
 
 # 1. Setup môi trường
-rm -rf store
+rm -rf store dataset_test
 mkdir -p dataset_test
 echo "Original Content" > dataset_test/secret.txt
 
@@ -33,5 +33,5 @@ echo "[4] Verify sau khi sửa chunk (Mong đợi: FAIL)..."
 python3 -m src.main verify $SNAP_ID;
 
 # Cleanup
-rm -rf store dataset_test
+# rm -rf store dataset_test
 echo "=== KẾT THÚC TEST TAMPER ==="

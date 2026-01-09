@@ -16,8 +16,18 @@ rm -f /tmp/checksums_original.txt /tmp/checksums_restored.txt
 
 # 1. Kiểm tra dataset_test có tồn tại không
 if [ ! -d "dataset_test" ]; then
-    echo -e "${RED}ERROR: dataset_test not found. Run generate_dataset.sh first!${NC}"
-    exit 1
+    echo -e "${YELLOW}WARNING: dataset_test not found. Running generate_dataset.sh...${NC}"
+    
+    # Chạy lệnh tạo dataset
+    bash tests/generate_dataset.sh
+    
+    # Kiểm tra lại xem sau khi chạy script thì dataset đã được tạo chưa
+    if [ ! -d "dataset_test" ]; then
+        echo -e "${RED}ERROR: Failed to create dataset_test. Exiting...${NC}"
+        exit 1
+    fi
+    
+    echo -e "${GREEN}SUCCESS: dataset_test created successfully.${NC}"
 fi
 
 # 2. Init và Backup

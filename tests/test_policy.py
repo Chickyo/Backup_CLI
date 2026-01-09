@@ -48,7 +48,7 @@ roles:
         
         # Chạy lệnh init (mong đợi thành công - exit code 0)
         result = subprocess.run(
-            ["python3", "-m", "src.main", "init", "store_test_policy"],
+            ["python3", "-m", "src.main", "init", "store"],
             capture_output=True, text=True
         )
         self.assertEqual(result.returncode, 0, "Admin should be able to init")
@@ -60,7 +60,7 @@ roles:
         
         # Chạy lệnh init (mong đợi thất bại - exit code 1)
         result = subprocess.run(
-            ["python3", "-m", "src.main", "init", "store_test_policy_fail"],
+            ["python3", "-m", "src.main", "init", "store_fail"],
             capture_output=True, text=True
         )
         
@@ -70,6 +70,6 @@ roles:
 
 if __name__ == '__main__':
     # Cleanup store tạm nếu có
-    if os.path.exists("store_test_policy"):
-        shutil.rmtree("store_test_policy")
+    if os.path.exists("store"):
+        shutil.rmtree("store")
     unittest.main()

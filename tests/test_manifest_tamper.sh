@@ -4,7 +4,9 @@
 echo "=== TEST MANIFEST TAMPERING ==="
 
 # 1. Setup
-rm -rf store
+# Cleanup
+rm -rf store dataset_manifest
+
 mkdir -p dataset_manifest
 echo "Test Data" > dataset_manifest/file.txt
 
@@ -31,6 +33,4 @@ echo "}" >> "$MANIFEST_FILE"
 echo "[4] Verifying tampered snapshot..."
 python3 -m src.main verify $SNAP_ID;
 
-# Cleanup
-rm -rf store dataset_manifest
 echo "=== MANIFEST TAMPER TEST COMPLETED ==="

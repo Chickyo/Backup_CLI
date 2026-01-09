@@ -7,7 +7,7 @@ NC='\033[0m'
 
 echo "=== TEST AUDIT LOG INTEGRITY ==="
 
-rm -rf store
+rm -rf store dataset_audit
 mkdir -p dataset_audit
 
 # 1. Tạo một loạt thao tác để ghi log
@@ -38,5 +38,3 @@ else
     echo -e "${RED}FAIL: Không phát hiện được sửa đổi trong Log!${NC}"
     exit 1
 fi
-
-rm -rf store dataset_audit
